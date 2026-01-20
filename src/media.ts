@@ -229,7 +229,7 @@ function getInputConstraints(input: IMediaInput): MediaStreamConstraints {
 
   const constraints: MediaStreamConstraints = { audio: presets, video: false };
   if (input.id) {
-    (constraints.audio as MediaTrackConstraints).deviceId = input.id;
+    (constraints.audio as MediaTrackConstraints).deviceId = { exact: input.id };
   }
 
   log.debug(`Using input constraints: ${JSON.stringify(constraints)}`, 'media');
