@@ -38,5 +38,5 @@ window.customElements.define(
         this.nodes.messageBox.innerText = this._message;
       }
     }
-  }
+  },
 );

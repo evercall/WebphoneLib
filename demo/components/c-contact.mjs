@@ -57,5 +57,5 @@ window.customElements.define(
       subscriptionEvents.removeEventListener(`notify-${this.data.contactUri}`, this);
       subscriptionEvents.removeEventListener(`remove-${this.data.contactUri}`, this);
     }
-  }
+  },
 );

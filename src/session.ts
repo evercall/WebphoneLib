@@ -1,7 +1,13 @@
 import { EventEmitter } from 'events';
 import pTimeout from 'p-timeout';
 
-import { Core, IncomingResponse, SessionDescriptionHandlerModifiers } from 'sip.js';
+import {
+  Core,
+  IncomingRequest,
+  NameAddrHeader,
+  OutgoingRequest,
+  SessionDescriptionHandlerModifiers,
+} from 'sip.js';
 
 import { Invitation } from 'sip.js/lib/api/invitation';
 import { Inviter } from 'sip.js/lib/api/inviter';
@@ -20,7 +26,15 @@ import { SessionStats } from './session-stats';
 import * as Time from './time';
 import { IMedia, IRemoteIdentity } from './types';
 
-export interface ISession {
+export interface ISession
+  extends EventEmitter<{
+    terminated: [{ id: string }];
+    statusUpdate: [{ id: string; status: SessionStatus }];
+    callQualityUpdate: [{ id: string }, SessionStats];
+    remoteIdentityUpdate: [{ id: string }, IRemoteIdentity];
+    bye: [any];
+    progressUpdate: [{ message: Core.IncomingMessage }];
+  }> {
   readonly id: string;
   readonly media: SessionMedia;
   readonly stats: SessionStats;
@@ -61,15 +75,20 @@ export interface ISession {
   /**
    * @returns {Date} Starting time of the call.
    */
-  startTime: any;
+  startTime: Date;
 
   /**
    * @returns {Date} End time of the call.
    */
-  endTime: any;
+  endTime: Date;
+
+  from: NameAddrHeader;
+
+  request: IncomingRequest | OutgoingRequest;
 
   accept(): Promise<ISessionAccept | void>;
   reject(rejectOptions?: InvitationRejectOptions): Promise<void>;
+  cancel(): Promise<void>;
   /**
    * Terminate the session.
    */
@@ -110,16 +129,6 @@ export interface ISession {
    * @param tones May only contain the characters `0-9A-D#*,`
    */
   dtmf(tones: string): void;
-
-  /* tslint:disable:unified-signatures */
-  on(event: 'terminated', listener: ({ id: string }) => void): this;
-  on(event: 'statusUpdate', listener: (session: { id: string; status: string }) => void): this;
-  on(event: 'callQualityUpdate', listener: ({ id: string }, stats: SessionStats) => void): this;
-  on(
-    event: 'remoteIdentityUpdate',
-    listener: ({ id: string }, remoteIdentity: IRemoteIdentity) => void
-  ): this;
-  /* tslint:enable:unified-signatures */
 }
 
 /**
@@ -130,7 +139,7 @@ const CAUSE_MAPPING = {
   480: 'temporarily_unavailable',
   484: 'address_incomplete',
   486: 'busy',
-  487: 'request_terminated'
+  487: 'request_terminated',
 };
 
 export interface ISessionAccept {
@@ -147,7 +156,17 @@ export interface ISessionCancelled {
 /**
  * @hidden
  */
-export class SessionImpl extends EventEmitter implements ISession {
+export class SessionImpl
+  extends EventEmitter<{
+    terminated: [{ id: string }];
+    statusUpdate: [{ id: string; status: string }];
+    callQualityUpdate: [{ id: string }, SessionStats];
+    remoteIdentityUpdate: [{ id: string }, IRemoteIdentity];
+    bye: [any];
+    progressUpdate: [{ message: Core.IncomingMessage }];
+  }>
+  implements ISession
+{
   public readonly id: string;
   public readonly media: SessionMedia;
   public readonly stats: SessionStats;
@@ -177,7 +196,7 @@ export class SessionImpl extends EventEmitter implements ISession {
     session,
     media,
     onTerminated,
-    isIncoming
+    isIncoming,
   }: {
     session: Inviter | Invitation;
     media: IMedia;
@@ -198,13 +217,13 @@ export class SessionImpl extends EventEmitter implements ISession {
     // seconds.
     // TODO: make this setting configurable.
     this.stats = new SessionStats(this.session, {
-      statsInterval: 5 * Time.second
+      statsInterval: 5 * Time.second,
     });
 
     // Terminated promise will resolve when the session is terminated. It will
     // be rejected when there is some fault is detected with the session after it
     // has been accepted.
-    this.terminatedPromise = new Promise(resolve => {
+    this.terminatedPromise = new Promise((resolve) => {
       this.session.stateChange.on((newState: SessionState) => {
         if (newState === SessionState.Terminated) {
           this.onTerminated(this.id);
@@ -228,6 +247,7 @@ export class SessionImpl extends EventEmitter implements ISession {
 
     // Track if the other side said bye before terminating.
     this.saidBye = false;
+    // @ts-ignore
     this.session.once('bye', () => {
       this.saidBye = true;
     });
@@ -242,7 +262,7 @@ export class SessionImpl extends EventEmitter implements ISession {
     // TODO: make these settings configurable.
     this.audioConnected = checkAudioConnected(this.session, {
       checkInterval: 0.5 * Time.second,
-      noAudioTimeout: 10 * Time.second
+      noAudioTimeout: 10 * Time.second,
     });
   }
 
@@ -276,6 +296,14 @@ export class SessionImpl extends EventEmitter implements ISession {
     return this.session.endTime;
   }
 
+  get request() {
+    return this.session.request;
+  }
+
+  get from() {
+    return this.session.request.from;
+  }
+
   public accept(): Promise<void> {
     throw new Error('Should be implemented in superclass');
   }
@@ -285,6 +313,10 @@ export class SessionImpl extends EventEmitter implements ISession {
   }
 
   public accepted(): Promise<ISessionAccept> {
+    throw new Error('Should be implemented in superclass');
+  }
+
+  public cancel(): Promise<void> {
     throw new Error('Should be implemented in superclass');
   }
 
@@ -305,8 +337,8 @@ export class SessionImpl extends EventEmitter implements ISession {
           onRejectThrow: reject,
           onProgress: resolve,
           onTrying: resolve,
-          sessionDescriptionHandlerModifiers: modifiers
-        })
+          sessionDescriptionHandlerModifiers: modifiers,
+        }),
       );
     });
   }
@@ -320,7 +352,7 @@ export class SessionImpl extends EventEmitter implements ISession {
   }
 
   public async blindTransfer(target: string): Promise<boolean> {
-    return this.transfer(UserAgent.makeURI(target)).then(success => {
+    return this.transfer(UserAgent.makeURI(target)).then((success) => {
       if (success) {
         this.bye();
       }
@@ -330,7 +362,7 @@ export class SessionImpl extends EventEmitter implements ISession {
   }
 
   public async attendedTransfer(target: SessionImpl): Promise<boolean> {
-    return this.transfer(target.session).then(success => {
+    return this.transfer(target.session).then((success) => {
       if (success) {
         this.bye();
       }
@@ -390,6 +422,8 @@ export class SessionImpl extends EventEmitter implements ISession {
       'media',
       'phoneNumber',
       'remoteIdentity',
+      'from',
+      'request',
       'saidBye',
       'startTime',
       'stats',
@@ -404,6 +438,7 @@ export class SessionImpl extends EventEmitter implements ISession {
       'hold',
       'reinvite',
       'reject',
+      'cancel',
       'terminate',
       'terminated',
       'unhold',
@@ -414,7 +449,7 @@ export class SessionImpl extends EventEmitter implements ISession {
       'cancel',
       'tried',
       'localStream',
-      'remoteStream'
+      'remoteStream',
     ]);
   }
 
@@ -424,7 +459,7 @@ export class SessionImpl extends EventEmitter implements ISession {
     onRejectThrow,
     onProgress,
     onTrying,
-    sessionDescriptionHandlerModifiers = []
+    sessionDescriptionHandlerModifiers = [],
   }) {
     return {
       requestDelegate: {
@@ -444,7 +479,7 @@ export class SessionImpl extends EventEmitter implements ISession {
             accepted: false,
             rejectCode: message.statusCode,
             rejectCause: CAUSE_MAPPING[message.statusCode],
-            rejectPhrase: message.reasonPhrase
+            rejectPhrase: message.reasonPhrase,
           });
         },
         onProgress: ({ message }: Core.IncomingResponse) => {
@@ -455,15 +490,15 @@ export class SessionImpl extends EventEmitter implements ISession {
         onTrying: () => {
           log.debug('Trying to setup the session', this.constructor.name);
           onTrying();
-        }
+        },
       },
       sessionDescriptionHandlerOptions: {
         constraints: {
           audio: true,
-          video: false
-        }
+          video: false,
+        },
       },
-      sessionDescriptionHandlerModifiers
+      sessionDescriptionHandlerModifiers,
     };
   }
 
@@ -524,7 +559,7 @@ export class SessionImpl extends EventEmitter implements ISession {
   }
 
   private async isTransferredPromise(target: Core.URI | UserAgentSession) {
-    return new Promise<boolean>(resolve => {
+    return new Promise<boolean>((resolve) => {
       const referrer = new Referrer(this.session, target);
 
       referrer.refer({
@@ -541,8 +576,8 @@ export class SessionImpl extends EventEmitter implements ISession {
             log.info('Transferred session is rejected!', this.constructor.name);
             resolve(false);
           },
-          onNotify: () => ({}) // To make sure the requestDelegate type is complete.
-        }
+          onNotify: () => ({}), // To make sure the requestDelegate type is complete.
+        },
       });
     });
   }

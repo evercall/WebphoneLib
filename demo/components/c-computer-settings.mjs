@@ -17,5 +17,5 @@ window.customElements.define(
       const template = document.querySelector('[data-component=c-computer-settings]');
       this.appendChild(template.content.cloneNode(true));
     }
-  }
+  },
 );

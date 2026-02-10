@@ -20,5 +20,5 @@ window.customElements.define(
     disconnectedCallback() {
       this.removeEventListener('click', this);
     }
-  }
+  },
 );

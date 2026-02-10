@@ -60,12 +60,12 @@ window.customElements.define(
       this.nodes.input.removeEventListener(
         'keydown',
         this.handleInputKeyDownEvent.bind(this),
-        true
+        true,
       );
 
       this.actions.call.removeEventListener('click', this);
 
       sipClient.callingEvents.removeEventListener('sessionsUpdated', this);
     }
-  }
+  },
 );

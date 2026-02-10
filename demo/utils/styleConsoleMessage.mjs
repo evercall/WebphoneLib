@@ -4,7 +4,7 @@ export default function styleConsoleMessage(level) {
     warn: `#ff7b24`, // Orange
     info: `#0051d4`, // Blue
     debug: `#666666`, // Gray
-    verbose: `#046614` // Green
+    verbose: `#046614`, // Green
   };
 
   // from Workbox

@@ -42,18 +42,18 @@ window.customElements.define(
       const template = document.querySelector('[data-component=c-volume-setting]');
       this.appendChild(template.content.cloneNode(true));
 
-      [this.nodes.inVol, this.nodes.outVol].forEach(n => {
+      [this.nodes.inVol, this.nodes.outVol].forEach((n) => {
         n.addEventListener('change', this.handleVolumeChange.bind(this));
       });
-      [this.nodes.inMute, this.nodes.outMute].forEach(n => {
+      [this.nodes.inMute, this.nodes.outMute].forEach((n) => {
         n.addEventListener('change', this.handleMuteChange.bind(this));
       });
     }
 
     disconnectedCallback() {
-      [this.nodes.inVol, this.nodes.inMute, this.nodes.outVol, this.nodes.outMute].forEach(n => {
+      [this.nodes.inVol, this.nodes.inMute, this.nodes.outVol, this.nodes.outMute].forEach((n) => {
         n.removeEventListener('change', this);
       });
     }
-  }
+  },
 );

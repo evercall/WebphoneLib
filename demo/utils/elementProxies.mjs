@@ -1,5 +1,5 @@
 function createProxyConstructor(type) {
-  return function(context) {
+  return function (context) {
     return new Proxy(new Map(), {
       get(obj, property) {
         if (!obj.has(property)) {
@@ -16,7 +16,7 @@ function createProxyConstructor(type) {
       },
       deleteProperty(obj, property) {
         return obj.delete(property);
-      }
+      },
     });
   };
 }

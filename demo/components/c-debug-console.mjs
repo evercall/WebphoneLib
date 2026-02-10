@@ -33,5 +33,5 @@ window.customElements.define(
     disconnectedCallback() {
       loggingEvents.removeEventListener('log_to_console', this);
     }
-  }
+  },
 );

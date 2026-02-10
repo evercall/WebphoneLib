@@ -34,7 +34,7 @@ window.customElements.define(
             const publisher = this.getOrCreatePublisher(target, {
               body: content,
               contentType: 'application/dialog-info+xml',
-              expires: 60
+              expires: 60,
             });
 
             if (!publisher) {
@@ -67,5 +67,5 @@ window.customElements.define(
     disconnectedCallback() {
       this.actions.publish.removeEventListener('click', this);
     }
-  }
+  },
 );

@@ -20,7 +20,7 @@ window.customElements.define(
         case 'click':
           {
             const {
-              target: { dataset }
+              target: { dataset },
             } = e;
 
             if (dataset.action) {
@@ -56,7 +56,7 @@ window.customElements.define(
         case 'clientStatusUpdate':
           {
             const {
-              detail: { status }
+              detail: { status },
             } = e;
             this.nodes.clientStatus.textContent = status;
           }
@@ -75,7 +75,7 @@ window.customElements.define(
       const template = document.querySelector('[data-component=c-voip-account]');
       this.appendChild(template.content.cloneNode(true));
 
-      [this.actions.register, this.actions.unregister, this.actions.reconfigure].forEach(n => {
+      [this.actions.register, this.actions.unregister, this.actions.reconfigure].forEach((n) => {
         n.addEventListener('click', this);
       });
 
@@ -94,7 +94,7 @@ window.customElements.define(
     }
 
     disconnectedCallback() {
-      [this.actions.register, this.actions.unregister, this.actions.reconfigure].forEach(n => {
+      [this.actions.register, this.actions.unregister, this.actions.reconfigure].forEach((n) => {
         n.removeEventListener('click', this);
       });
 
@@ -102,5 +102,5 @@ window.customElements.define(
 
       sipClient.callingEvents.removeEventListener('clientStatusUpdate', this);
     }
-  }
+  },
 );

@@ -24,7 +24,7 @@ window.customElements.define(
       switch (e.type) {
         case 'click':
           const {
-            target: { dataset }
+            target: { dataset },
           } = e;
 
           if (dataset.action) {
@@ -65,5 +65,5 @@ window.customElements.define(
       this.actions.subscribe.removeEventListener('click', this);
       this.actions.unsubscribe.removeEventListener('click', this);
     }
-  }
+  },
 );

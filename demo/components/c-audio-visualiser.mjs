@@ -80,5 +80,5 @@ window.customElements.define(
     disconnectedCallback() {
       sipClient.callingEvents.removeEventListener('sessionAccepted', this);
     }
-  }
+  },
 );

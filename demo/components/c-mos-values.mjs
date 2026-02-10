@@ -36,5 +36,5 @@ window.customElements.define(
     disconnectedCallback() {
       sipClient.callingEvents.removeEventListener('changeMosValues', this);
     }
-  }
+  },
 );

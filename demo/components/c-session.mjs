@@ -38,7 +38,7 @@ window.customElements.define(
 
     async handleEvent(e) {
       const {
-        target: { dataset }
+        target: { dataset },
       } = e;
 
       if (dataset.action) {
@@ -125,8 +125,8 @@ window.customElements.define(
         this.actions.hold,
         this.actions.unhold,
         this.actions.hangup,
-        this.nodes.additionalInterface
-      ].forEach(n => {
+        this.nodes.additionalInterface,
+      ].forEach((n) => {
         n.addEventListener('click', this);
       });
 
@@ -143,8 +143,8 @@ window.customElements.define(
         this.actions.hold,
         this.actions.unhold,
         this.actions.hangup,
-        this.nodes.additionalInterface
-      ].forEach(n => {
+        this.nodes.additionalInterface,
+      ].forEach((n) => {
         n.removeEventListener('click', this);
       });
       this.session.removeListener('statusUpdate', handleSessionStatusUpdate.bind(this));
@@ -153,5 +153,5 @@ window.customElements.define(
     attributeChangedCallback(name, oldValue, newValue) {
       this.session = sipClient.getSession(newValue);
     }
-  }
+  },
 );

@@ -57,5 +57,5 @@ window.customElements.define(
     disconnectedCallback() {
       sipClient.callingEvents.removeEventListener('sessionsUpdated', this);
     }
-  }
+  },
 );

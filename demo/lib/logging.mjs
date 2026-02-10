@@ -7,7 +7,7 @@ const LEVELS = {
   warn: 3,
   info: 2,
   verbose: 1,
-  debug: 0
+  debug: 0,
 };
 
 export let verbosity = 'info';
@@ -18,8 +18,8 @@ export class Logger {
 
     // Define aliases for each log level on Logger.
     // eg. `Logger.info(...) = Logger.log('info', ...)`
-    Object.keys(LEVELS).forEach(level => {
-      this[level] = function() {
+    Object.keys(LEVELS).forEach((level) => {
+      this[level] = function () {
         this.log.call(this, level, ...arguments);
       }.bind(this);
     });
@@ -31,7 +31,7 @@ export class Logger {
     const module = this.module;
     if (levelIdx >= verbosityIdx) {
       loggingEvents.dispatchEvent(
-        new CustomEvent('log_to_console', { detail: { level, message, module } })
+        new CustomEvent('log_to_console', { detail: { level, message, module } }),
       );
     }
   }

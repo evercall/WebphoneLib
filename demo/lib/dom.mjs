@@ -16,7 +16,7 @@ export function getFormValues(form) {
   return Array.from(form).reduce((prev, { name, value }) => {
     if (name) {
       return Object.assign(prev, {
-        [name]: value
+        [name]: value,
       });
     } else {
       return prev;

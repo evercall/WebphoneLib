@@ -113,5 +113,5 @@ window.customElements.define(
     attributeChangedCallback(name, oldValue, newValue) {
       this.session = sipClient.getSession(newValue);
     }
-  }
+  },
 );

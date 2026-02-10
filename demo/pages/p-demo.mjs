@@ -16,5 +16,5 @@ window.customElements.define(
       const template = document.querySelector('[data-component=p-demo]');
       this.appendChild(template.content.cloneNode(true));
     }
-  }
+  },
 );

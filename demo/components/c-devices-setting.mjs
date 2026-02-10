@@ -37,17 +37,17 @@ window.customElements.define(
       const template = document.querySelector('[data-component=c-devices-setting]');
       this.appendChild(template.content.cloneNode(true));
 
-      [this.nodes.inputSelect, this.nodes.outputSelect].forEach(n => {
+      [this.nodes.inputSelect, this.nodes.outputSelect].forEach((n) => {
         n.addEventListener('change', this);
       });
       this.nodes.play.addEventListener('click', this);
     }
 
     disconnectedCallback() {
-      [this.nodes.inputSelect, this.nodes.outputSelect].forEach(n => {
+      [this.nodes.inputSelect, this.nodes.outputSelect].forEach((n) => {
         n.removeEventListener('change', this);
       });
       this.nodes.play.removeEventListener('click', this);
     }
-  }
+  },
 );
