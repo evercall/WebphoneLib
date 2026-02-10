@@ -24,7 +24,7 @@ import { SessionMedia } from './session-media';
 import { SessionStats } from './session-stats';
 import * as Time from './time';
 import { IMedia, IRemoteIdentity } from './types';
-import * as EventEmitter from 'node:events';
+import { EventEmitter } from 'node:events';
 
 export interface ISession extends EventEmitter<{
   terminated: [{ id: string }];
