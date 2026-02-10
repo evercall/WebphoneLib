@@ -18,7 +18,7 @@ class AutoplaySingleton extends EventEmitter implements IAutoplay {
 
   constructor() {
     super();
-    this.allowed = new Promise((resolve) => {
+    this.allowed = new Promise(resolve => {
       this.once('allowed', resolve);
     });
   }

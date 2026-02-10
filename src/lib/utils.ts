@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import { audioContext } from '../audio-context';
 
 /**
@@ -77,5 +78,101 @@ export function clamp(value: number, min: number, max: number): number {
     return max;
   } else {
     return value;
+  }
+}
+
+export class TypedEventEmitter<TEvents extends Record<string, unknown[]>> {
+  private emitter = new EventEmitter();
+
+  emit<TEventName extends keyof TEvents & string>(
+    eventName: TEventName,
+    ...eventArg: TEvents[TEventName]
+  ): boolean {
+    return this.emitter.emit(eventName, eventArg);
+  }
+
+  on<TEventName extends keyof TEvents & string>(
+    eventName: TEventName,
+    handler: (...eventArg: TEvents[TEventName]) => void
+  ): EventEmitter {
+    return this.emitter.on(eventName, handler);
+  }
+
+  once<TEventName extends keyof TEvents & string>(
+    eventName: TEventName,
+    handler: (...eventArg: TEvents[TEventName]) => void
+  ): EventEmitter {
+    return this.emitter.once(eventName, handler);
+  }
+
+  off<TEventName extends keyof TEvents & string>(
+    eventName: TEventName,
+    handler: (...eventArg: TEvents[TEventName]) => void
+  ): EventEmitter {
+    return this.emitter.off(eventName, handler);
+  }
+
+  addListener<TEventName extends keyof TEvents & string>(
+    eventName: TEventName,
+    handler: (...eventArg: TEvents[TEventName]) => void
+  ): EventEmitter {
+    return this.emitter.addListener(eventName, handler);
+  }
+
+  prependListener<TEventName extends keyof TEvents & string>(
+    eventName: TEventName,
+    handler: (...eventArg: TEvents[TEventName]) => void
+  ): EventEmitter {
+    return this.emitter.prependListener(eventName, handler);
+  }
+
+  prependOnceListener<TEventName extends keyof TEvents & string>(
+    eventName: TEventName,
+    handler: (...eventArg: TEvents[TEventName]) => void
+  ): EventEmitter {
+    return this.emitter.prependOnceListener(eventName, handler);
+  }
+
+  removeListener<TEventName extends keyof TEvents & string>(
+    eventName: TEventName,
+    handler: (...eventArg: TEvents[TEventName]) => void
+  ): EventEmitter {
+    return this.emitter.removeListener(eventName, handler);
+  }
+
+  removeAllListeners(event?: string | symbol): EventEmitter {
+    return this.emitter.removeAllListeners(event);
+  }
+
+  eventNames(): (string | symbol)[] {
+    return this.emitter.eventNames();
+  }
+
+  getMaxListeners(): number {
+    return this.emitter.getMaxListeners();
+  }
+
+  listenerCount(type: string | symbol): number {
+    return this.emitter.listenerCount(type);
+  }
+
+  listeners<TEventName extends keyof TEvents & string>(
+    eventName: TEventName
+  ): ((...eventArg: TEvents[TEventName]) => void)[] {
+    return (this.emitter.listeners(eventName) as unknown) as ((
+      ...eventArg: TEvents[TEventName]
+    ) => void)[];
+  }
+
+  rawListeners<TEventName extends keyof TEvents & string>(
+    eventName: TEventName
+  ): ((...eventArg: TEvents[TEventName]) => void)[] {
+    return (this.emitter.rawListeners(eventName) as unknown) as ((
+      ...eventArg: TEvents[TEventName]
+    ) => void)[];
+  }
+
+  setMaxListeners(n: number): EventEmitter {
+    return this.emitter.setMaxListeners(n);
   }
 }

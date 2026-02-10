@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 
 import * as Features from './features';
-import { eqSet } from './lib/utils';
+import { eqSet, TypedEventEmitter } from './lib/utils';
 import { log } from './logger';
 import * as Time from './time';
 import { IMediaInput } from './types';
@@ -23,8 +23,8 @@ interface IMediaDevices {
   readonly outputs: IAudioDevice[];
   on(
     event: 'devicesChanged' | 'permissionGranted' | 'permissionRevoked',
-    listener: () => void,
-  ): this;
+    listener: () => void
+  ): EventEmitter;
 }
 
 const UPDATE_INTERVAL = 1 * Time.second;
@@ -34,13 +34,12 @@ const UPDATE_INTERVAL = 1 * Time.second;
  * with WebRTC.
  */
 class MediaSingleton
-  extends EventEmitter<{
+  extends TypedEventEmitter<{
     devicesChanged: [];
     permissionGranted: [];
     permissionRevoked: [];
   }>
-  implements IMediaDevices
-{
+  implements IMediaDevices {
   private allDevices: IAudioDevice[] = [];
   private requestPermissionPromise: Promise<void>;
   private timer: number = undefined;
@@ -59,11 +58,11 @@ class MediaSingleton
   }
 
   get inputs() {
-    return this.allDevices.filter((d) => d.kind === 'audioinput');
+    return this.allDevices.filter(d => d.kind === 'audioinput');
   }
 
   get outputs() {
-    return this.allDevices.filter((d) => d.kind === 'audiooutput');
+    return this.allDevices.filter(d => d.kind === 'audiooutput');
   }
 
   /**
@@ -100,7 +99,7 @@ class MediaSingleton
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
-          video: false,
+          video: false
         });
 
         if (!this.hadPermission) {
@@ -128,11 +127,11 @@ class MediaSingleton
     log.debug(`Requesting input stream with: audioProcessing=${input.audioProcessing}`, 'media');
     const constraints = getInputConstraints(input);
     const promise = navigator.mediaDevices.getUserMedia(constraints);
-    promise.then((stream) => {
-      stream.getTracks().forEach((track) => {
+    promise.then(stream => {
+      stream.getTracks().forEach(track => {
         log.debug(
           `Media stream track has settings: ${JSON.stringify(track.getSettings())}`,
-          'media',
+          'media'
         );
       });
     });
@@ -140,7 +139,7 @@ class MediaSingleton
   }
 
   public closeStream(stream: MediaStream): void {
-    stream.getTracks().forEach((track) => track.stop());
+    stream.getTracks().forEach(track => track.stop());
   }
 
   private async enumerateDevices(): Promise<MediaDeviceInfo[]> {
@@ -177,24 +176,26 @@ class MediaSingleton
   private updateDevices(enumeratedDevices: MediaDeviceInfo[]) {
     // Map the found devices to our own format, and filter out videoinput's.
     const allDevices = enumeratedDevices
-      .map((d: MediaDeviceInfo): IAudioDevice => {
-        if (!d.label) {
-          // This should not happen, but safe guard that devices without a name
-          // cannot enter our device state.
-          return undefined;
+      .map(
+        (d: MediaDeviceInfo): IAudioDevice => {
+          if (!d.label) {
+            // This should not happen, but safe guard that devices without a name
+            // cannot enter our device state.
+            return undefined;
+          }
+          if (d.kind === 'audioinput') {
+            return { id: d.deviceId, name: d.label, kind: 'audioinput' };
+          } else if (d.kind === 'audiooutput') {
+            return { id: d.deviceId, name: d.label, kind: 'audiooutput' };
+          } else {
+            return undefined;
+          }
         }
-        if (d.kind === 'audioinput') {
-          return { id: d.deviceId, name: d.label, kind: 'audioinput' };
-        } else if (d.kind === 'audiooutput') {
-          return { id: d.deviceId, name: d.label, kind: 'audiooutput' };
-        } else {
-          return undefined;
-        }
-      })
-      .filter((d) => d !== undefined);
+      )
+      .filter(d => d !== undefined);
 
-    const newIds = new Set(allDevices.map((d) => d.id));
-    const oldIds = new Set(this.allDevices.map((d) => d.id));
+    const newIds = new Set(allDevices.map(d => d.id));
+    const oldIds = new Set(this.allDevices.map(d => d.id));
 
     if (!eqSet(newIds, oldIds)) {
       this.allDevices = allDevices;
@@ -217,7 +218,7 @@ function getInputConstraints(input: IMediaInput): MediaStreamConstraints {
         googEchoCancellation: true,
         googHighpassFilter: true,
         googNoiseSuppression: true,
-        googTypingNoiseDetection: true,
+        googTypingNoiseDetection: true
       }
     : {
         echoCancellation: false,
@@ -229,7 +230,7 @@ function getInputConstraints(input: IMediaInput): MediaStreamConstraints {
         googEchoCancellation: false,
         googHighpassFilter: false,
         googNoiseSuppression: false,
-        googTypingNoiseDetection: false,
+        googTypingNoiseDetection: false
       };
 
   const constraints: MediaStreamConstraints = { audio: presets, video: false };

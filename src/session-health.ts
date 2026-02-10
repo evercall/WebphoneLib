@@ -5,11 +5,11 @@ export function checkAudioConnected(
   session: UserAgentSession,
   {
     checkInterval,
-    noAudioTimeout,
+    noAudioTimeout
   }: {
     checkInterval: number;
     noAudioTimeout: number;
-  },
+  }
 ): Promise<void> {
   let checkTimer: number;
 
@@ -38,7 +38,7 @@ export function checkAudioConnected(
         const checkStats = () => {
           pc.getStats().then((stats: RTCStatsReport) => {
             const buckets = Array.from(stats.values());
-            const outbound = buckets.find((obj) => obj.type === 'outbound-rtp');
+            const outbound = buckets.find(obj => obj.type === 'outbound-rtp');
             if (outbound && outbound.packetsSent > 0) {
               resolve();
             } else {

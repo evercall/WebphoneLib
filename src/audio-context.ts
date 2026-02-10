@@ -1,7 +1,19 @@
+type WindowAudioContext = {
+  prototype: AudioContext;
+  new (contextOptions?: AudioContextOptions): AudioContext;
+};
+
 function createAudioContext(): AudioContext {
-  const cls = (window as any).AudioContext || (window as any).webkitAudioContext;
+  let cls = 'AudioContext' in window ? window.AudioContext : undefined;
   if (cls) {
     return new cls();
+  }
+
+  if ('webkitAudioContext' in window) {
+    cls = (window as any).webkitAudioContext as WindowAudioContext;
+    if (cls) {
+      return new cls();
+    }
   }
 }
 

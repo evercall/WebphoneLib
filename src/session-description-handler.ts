@@ -6,10 +6,10 @@ import { isPrivateIP } from './lib/utils';
 import { log } from './logger';
 
 export function stripPrivateIps(
-  description: RTCSessionDescriptionInit,
+  description: RTCSessionDescriptionInit
 ): Promise<RTCSessionDescriptionInit> {
   const lines = description.sdp.split(/\r\n/);
-  const filtered = lines.filter((line) => {
+  const filtered = lines.filter(line => {
     const m = /a=candidate:\d+ \d+ (?:udp|tcp) \d+ (\d+\.\d+\.\d+\.\d+)/i.exec(line);
     return !m || !isPrivateIP(m[1]);
   });
@@ -22,7 +22,7 @@ export function sessionDescriptionHandlerFactory(session, options): SessionDescr
 
   session.__streams = {
     localStream: audioContext.createMediaStreamDestination(),
-    remoteStream: new MediaStream(),
+    remoteStream: new MediaStream()
   };
 
   (sdh as any).getMediaStream = async () => {
@@ -37,7 +37,7 @@ export function sessionDescriptionHandlerFactory(session, options): SessionDescr
 
     let remoteStream = new MediaStream();
     if (pc.getReceivers) {
-      pc.getReceivers().forEach((receiver) => {
+      pc.getReceivers().forEach(receiver => {
         const rtrack = receiver.track;
         if (rtrack) {
           remoteStream.addTrack(rtrack);

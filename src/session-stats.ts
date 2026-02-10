@@ -16,7 +16,7 @@ class StatsAggregation {
     highest: undefined,
     last: undefined,
     lowest: undefined,
-    sum: 0,
+    sum: 0
   };
 
   public add(sample: number) {
@@ -70,10 +70,10 @@ export class SessionStats extends EventEmitter {
   public constructor(
     session: UserAgentSession,
     {
-      statsInterval,
+      statsInterval
     }: {
       statsInterval: number;
-    },
+    }
   ) {
     super();
 
@@ -86,7 +86,6 @@ export class SessionStats extends EventEmitter {
         const pc = (session.sessionDescriptionHandler as any).peerConnection;
         pc.getStats().then((stats: RTCStatsReport) => {
           if (this.add(stats)) {
-            // @ts-ignore
             this.emit('statsUpdated', this);
           } else {
             log.debug('No useful stats' + stats, this.constructor.name);
@@ -96,7 +95,7 @@ export class SessionStats extends EventEmitter {
     });
   }
 
-  public clearStatsTimer() {
+  public clearStatsTimer(): void {
     if (this.statsTimer) {
       window.clearInterval(this.statsTimer);
       delete this.statsTimer;
@@ -133,7 +132,7 @@ export class SessionStats extends EventEmitter {
 
         // Firefox doesn't have or expose this property. Fallback to using 50ms as
         // a guess for RTT.
-        rtt: candidatePair.currentRoundTripTime || 0.05,
+        rtt: candidatePair.currentRoundTripTime || 0.05
       };
 
       this.mos.add(calculateMOS(measurement));

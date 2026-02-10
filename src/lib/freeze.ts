@@ -18,12 +18,12 @@ function getPropertyDescriptor(obj: any, name: string) {
 // eslint-disable-next-line @typescript-eslint/ban-types
 export function createFrozenProxy<T>(obj: object, impl: T, properties: string[]): T {
   const missingDescriptors = properties.filter(
-    (name) => getPropertyDescriptor(impl, name) === undefined,
+    name => getPropertyDescriptor(impl, name) === undefined
   );
 
   if (missingDescriptors.length > 0) {
     throw new Error(
-      `Implementation is not complete, missing properties: ${missingDescriptors.join(', ')}`,
+      `Implementation is not complete, missing properties: ${missingDescriptors.join(', ')}`
     );
   }
 
@@ -40,9 +40,9 @@ export function createFrozenProxy<T>(obj: object, impl: T, properties: string[])
         return proxy;
       } else {
         return Object.defineProperty(proxy, name, {
-          get: desc.get.bind(impl),
+          get: desc.get.bind(impl)
         });
       }
-    }, obj),
+    }, obj)
   );
 }

@@ -1,4 +1,3 @@
-import { EventEmitter } from 'events';
 import pTimeout from 'p-timeout';
 
 import {
@@ -6,7 +5,7 @@ import {
   IncomingRequest,
   NameAddrHeader,
   OutgoingRequest,
-  SessionDescriptionHandlerModifiers,
+  SessionDescriptionHandlerModifiers
 } from 'sip.js';
 
 import { Invitation } from 'sip.js/lib/api/invitation';
@@ -25,14 +24,15 @@ import { SessionMedia } from './session-media';
 import { SessionStats } from './session-stats';
 import * as Time from './time';
 import { IMedia, IRemoteIdentity } from './types';
+import { TypedEventEmitter } from './lib/utils';
 
 export interface ISession
-  extends EventEmitter<{
+  extends TypedEventEmitter<{
     terminated: [{ id: string }];
     statusUpdate: [{ id: string; status: SessionStatus }];
     callQualityUpdate: [{ id: string }, SessionStats];
     remoteIdentityUpdate: [{ id: string }, IRemoteIdentity];
-    bye: [any];
+    bye: [];
     progressUpdate: [{ message: Core.IncomingMessage }];
   }> {
   readonly id: string;
@@ -139,7 +139,7 @@ const CAUSE_MAPPING = {
   480: 'temporarily_unavailable',
   484: 'address_incomplete',
   486: 'busy',
-  487: 'request_terminated',
+  487: 'request_terminated'
 };
 
 export interface ISessionAccept {
@@ -157,16 +157,15 @@ export interface ISessionCancelled {
  * @hidden
  */
 export class SessionImpl
-  extends EventEmitter<{
+  extends TypedEventEmitter<{
     terminated: [{ id: string }];
     statusUpdate: [{ id: string; status: string }];
     callQualityUpdate: [{ id: string }, SessionStats];
     remoteIdentityUpdate: [{ id: string }, IRemoteIdentity];
-    bye: [any];
+    bye: [];
     progressUpdate: [{ message: Core.IncomingMessage }];
   }>
-  implements ISession
-{
+  implements ISession {
   public readonly id: string;
   public readonly media: SessionMedia;
   public readonly stats: SessionStats;
@@ -196,7 +195,7 @@ export class SessionImpl
     session,
     media,
     onTerminated,
-    isIncoming,
+    isIncoming
   }: {
     session: Inviter | Invitation;
     media: IMedia;
@@ -217,13 +216,13 @@ export class SessionImpl
     // seconds.
     // TODO: make this setting configurable.
     this.stats = new SessionStats(this.session, {
-      statsInterval: 5 * Time.second,
+      statsInterval: 5 * Time.second
     });
 
     // Terminated promise will resolve when the session is terminated. It will
     // be rejected when there is some fault is detected with the session after it
     // has been accepted.
-    this.terminatedPromise = new Promise((resolve) => {
+    this.terminatedPromise = new Promise(resolve => {
       this.session.stateChange.on((newState: SessionState) => {
         if (newState === SessionState.Terminated) {
           this.onTerminated(this.id);
@@ -247,7 +246,6 @@ export class SessionImpl
 
     // Track if the other side said bye before terminating.
     this.saidBye = false;
-    // @ts-ignore
     this.session.once('bye', () => {
       this.saidBye = true;
     });
@@ -262,7 +260,7 @@ export class SessionImpl
     // TODO: make these settings configurable.
     this.audioConnected = checkAudioConnected(this.session, {
       checkInterval: 0.5 * Time.second,
-      noAudioTimeout: 10 * Time.second,
+      noAudioTimeout: 10 * Time.second
     });
   }
 
@@ -296,11 +294,11 @@ export class SessionImpl
     return this.session.endTime;
   }
 
-  get request() {
+  get request(): Core.OutgoingRequestMessage | Core.IncomingRequestMessage {
     return this.session.request;
   }
 
-  get from() {
+  get from(): Core.NameAddrHeader {
     return this.session.request.from;
   }
 
@@ -337,8 +335,8 @@ export class SessionImpl
           onRejectThrow: reject,
           onProgress: resolve,
           onTrying: resolve,
-          sessionDescriptionHandlerModifiers: modifiers,
-        }),
+          sessionDescriptionHandlerModifiers: modifiers
+        })
       );
     });
   }
@@ -352,7 +350,7 @@ export class SessionImpl
   }
 
   public async blindTransfer(target: string): Promise<boolean> {
-    return this.transfer(UserAgent.makeURI(target)).then((success) => {
+    return this.transfer(UserAgent.makeURI(target)).then(success => {
       if (success) {
         this.bye();
       }
@@ -362,7 +360,7 @@ export class SessionImpl
   }
 
   public async attendedTransfer(target: SessionImpl): Promise<boolean> {
-    return this.transfer(target.session).then((success) => {
+    return this.transfer(target.session).then(success => {
       if (success) {
         this.bye();
       }
@@ -374,12 +372,12 @@ export class SessionImpl
   /**
    * Reconfigure the WebRTC peerconnection.
    */
-  public rebuildSessionDescriptionHandler() {
+  public rebuildSessionDescriptionHandler(): void {
     (this.session as any)._sessionDescriptionHandler = undefined;
     (this.session as any).setupSessionDescriptionHandler();
   }
 
-  public bye() {
+  public bye(): Promise<Core.OutgoingByeRequest> {
     return this.session.bye();
   }
 
@@ -449,7 +447,7 @@ export class SessionImpl
       'cancel',
       'tried',
       'localStream',
-      'remoteStream',
+      'remoteStream'
     ]);
   }
 
@@ -459,7 +457,7 @@ export class SessionImpl
     onRejectThrow,
     onProgress,
     onTrying,
-    sessionDescriptionHandlerModifiers = [],
+    sessionDescriptionHandlerModifiers = []
   }) {
     return {
       requestDelegate: {
@@ -479,7 +477,7 @@ export class SessionImpl
             accepted: false,
             rejectCode: message.statusCode,
             rejectCause: CAUSE_MAPPING[message.statusCode],
-            rejectPhrase: message.reasonPhrase,
+            rejectPhrase: message.reasonPhrase
           });
         },
         onProgress: ({ message }: Core.IncomingResponse) => {
@@ -490,19 +488,22 @@ export class SessionImpl
         onTrying: () => {
           log.debug('Trying to setup the session', this.constructor.name);
           onTrying();
-        },
+        }
       },
       sessionDescriptionHandlerOptions: {
         constraints: {
           audio: true,
-          video: false,
-        },
+          video: false
+        }
       },
-      sessionDescriptionHandlerModifiers,
+      sessionDescriptionHandlerModifiers
     };
   }
 
-  protected extractRemoteIdentity() {
+  protected extractRemoteIdentity(): {
+    phoneNumber: string;
+    displayName: string;
+  } {
     let phoneNumber: string = this.session.remoteIdentity.uri.user;
     let displayName: string;
     if (this.session.assertedIdentity) {
@@ -559,7 +560,7 @@ export class SessionImpl
   }
 
   private async isTransferredPromise(target: Core.URI | UserAgentSession) {
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>(resolve => {
       const referrer = new Referrer(this.session, target);
 
       referrer.refer({
@@ -576,8 +577,8 @@ export class SessionImpl
             log.info('Transferred session is rejected!', this.constructor.name);
             resolve(false);
           },
-          onNotify: () => ({}), // To make sure the requestDelegate type is complete.
-        },
+          onNotify: () => ({}) // To make sure the requestDelegate type is complete.
+        }
       });
     });
   }

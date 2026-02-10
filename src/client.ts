@@ -1,5 +1,3 @@
-import { EventEmitter } from 'events';
-
 import { Core } from 'sip.js';
 import { Notification } from 'sip.js/lib/api/notification';
 import { Publisher } from 'sip.js/lib/api/publisher';
@@ -20,10 +18,20 @@ import { statusFromDialog } from './subscription';
 import { second } from './time';
 import { ITransport, ReconnectableTransport, TransportFactory, UAFactory } from './transport';
 import { IClientOptions, IMedia } from './types';
+import { TypedEventEmitter } from './lib/utils';
+import { EventEmitter } from 'events';
 
 // TODO: use EventTarget instead of EventEmitter.
+export type ClientEventEmitter = TypedEventEmitter<{
+  subscriptionNotify: [string, string];
+  sessionAdded: [{ id: string }];
+  sessionRemoved: [{ id: string }];
+  subscriptionTerminated: [string];
+  statusUpdate: [any];
+  invite: [ISession];
+}>;
 
-export interface IClient {
+export interface IClient extends ClientEventEmitter {
   /**
    * To setup a different voip account, sipserver or media devices. If you want
    * to adapt media devices it is better to do it on-the-fly by adapting the
@@ -104,7 +112,7 @@ export interface IClient {
    *
    * ```
    */
-  on(event: 'invite', listener: (session: ISession) => void): this;
+  on(event: 'invite', listener: (session: ISession) => void): EventEmitter;
 
   /**
    * When a notify event for a specific subscription occurs, the status is
@@ -121,19 +129,22 @@ export interface IClient {
    * await client.subscribe(contact);
    * ```
    */
-  on(event: 'subscriptionNotify', listener: (contact: string, status: string) => void): this;
+  on(
+    event: 'subscriptionNotify',
+    listener: (contact: string, status: string) => void
+  ): EventEmitter;
 
   /**
    * When a session is added to the sessions by an incoming or outgoing
    * call, a sessionAdded event is emitted.
    */
-  on(event: 'sessionAdded', listener: ({ id }) => void): this;
+  on(event: 'sessionAdded', listener: ({ id }) => void): EventEmitter;
 
   /**
    * When a session is removed because it is terminated  a sessionRemoved event
    * is emitted.
    */
-  on(event: 'sessionRemoved', listener: ({ id }) => void): this;
+  on(event: 'sessionRemoved', listener: ({ id }) => void): EventEmitter;
   /* tslint:enable:unified-signatures */
 }
 
@@ -145,7 +156,7 @@ interface ISubscriptionNotification {
  * @hidden
  */
 export class ClientImpl
-  extends EventEmitter<{
+  extends TypedEventEmitter<{
     subscriptionNotify: [string, string];
     sessionAdded: [{ id: string }];
     sessionRemoved: [{ id: string }];
@@ -153,8 +164,7 @@ export class ClientImpl
     statusUpdate: [any];
     invite: [ISession];
   }>
-  implements IClient
-{
+  implements IClient {
   public defaultMedia: IMedia;
 
   private readonly sessions: { [index: string]: SessionImpl } = {};
@@ -263,10 +273,10 @@ export class ClientImpl
           const status = statusFromDialog(notification);
           log.debug(
             `[blf] ${notification}  \n accepted, emitting notify event with status ${status}`,
-            'client.subscriptions.delegate.onNotify',
+            'client.subscriptions.delegate.onNotify'
           );
           this.emit('subscriptionNotify', uri, status);
-        },
+        }
       };
 
       this.subscriptions[uri].stateChange.on((newState: SubscriptionState) => {
@@ -297,14 +307,16 @@ export class ClientImpl
         if (retryAfter) {
           log.info(
             `Subscription rate-limited. Retrying after ${retryAfter} seconds.`,
-            this.constructor.name,
+            this.constructor.name
           );
           waitTime = Number(retryAfter) * second;
         }
 
         setTimeout(() => {
           this.removeSubscription({ uri });
-          this.subscribe(uri).then(resolve).catch(reject);
+          this.subscribe(uri)
+            .then(resolve)
+            .catch(reject);
         }, waitTime);
       });
 
@@ -338,7 +350,7 @@ export class ClientImpl
   }
 
   public getSessions(): ISession[] {
-    return Object.values(this.sessions).map((session) => session.freeze());
+    return Object.values(this.sessions).map(session => session.freeze());
   }
 
   public attendedTransfer(a: ISession, b: ISession): Promise<boolean> {
@@ -369,14 +381,14 @@ export class ClientImpl
     this.transport.delegate = options.transport.delegate;
 
     this.transport.on('reviveSessions', () => {
-      Object.values(this.sessions).forEach(async (session) => {
+      Object.values(this.sessions).forEach(async session => {
         session.rebuildSessionDescriptionHandler();
         await session.reinvite();
       });
     });
 
     this.transport.on('reviveSubscriptions', () => {
-      Object.keys(this.subscriptions).forEach(async (uri) => {
+      Object.keys(this.subscriptions).forEach(async uri => {
         // Awaiting each uri, because if a uri cannot be resolved
         // 'immediately' due to rate-limiting, there is a big chance that
         // the next re-subscribe will also be rate-limited. To avoid spamming
@@ -392,7 +404,7 @@ export class ClientImpl
         session: invitation,
         onTerminated: this.onSessionTerminated.bind(this),
         cancelled,
-        isIncoming: true,
+        isIncoming: true
       });
 
       this.addSession(session);
@@ -400,7 +412,7 @@ export class ClientImpl
       this.emit('invite', session.freeze());
     });
 
-    this.transport.on('statusUpdate', (status) => {
+    this.transport.on('statusUpdate', status => {
       log.debug(`Status change to: ${status}`, this.constructor.name);
 
       if (status === 'connected') {
@@ -417,7 +429,7 @@ export class ClientImpl
     if (!(sessionId in this.sessions)) {
       log.info(
         `Broken session (probably due to failed invite) ${sessionId} is terminated.`,
-        this.constructor.name,
+        this.constructor.name
       );
       return;
     }
@@ -434,7 +446,7 @@ export class ClientImpl
       media: this.defaultMedia,
       session: outgoingSession,
       onTerminated: this.onSessionTerminated.bind(this),
-      isIncoming: false,
+      isIncoming: false
     });
 
     this.addSession(session);
@@ -449,7 +461,7 @@ export class ClientImpl
       await Promise.race([
         Promise.all([session.invite(), session.tried()]),
         session.accepted(), // trying might not always emitted, in that case accepted might have < not sure anymore
-        disconnectedPromise,
+        disconnectedPromise
       ]);
     } catch (e) {
       this.removeSession(session);
@@ -511,7 +523,7 @@ type ClientCtor = new (options: IClientOptions) => IClient;
  * generally prevents using private attributes. But, even in Typescript there
  * are ways around this.
  */
-export const Client: ClientCtor = function (clientOptions: IClientOptions) {
+export const Client: ClientCtor = (function(clientOptions: IClientOptions) {
   const uaFactory = (options: UserAgentOptions) => {
     return new UserAgent(options);
   };
@@ -538,6 +550,6 @@ export const Client: ClientCtor = function (clientOptions: IClientOptions) {
     'removeListener',
     'resubscribe',
     'subscribe',
-    'unsubscribe',
+    'unsubscribe'
   ]);
-} as any as ClientCtor;
+} as any) as ClientCtor;

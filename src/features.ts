@@ -4,14 +4,14 @@ export const webaudio = {
   mediaDevices,
   setSinkId: 'Audio' in window && 'setSinkId' in new (window as any).Audio(),
   getUserMedia: mediaDevices && 'getUserMedia' in window.navigator.mediaDevices,
-  audioContext: 'AudioContext' in window || 'webkitAudioContext' in window,
+  audioContext: 'AudioContext' in window || 'webkitAudioContext' in window
 };
 
 const peerConnection = 'RTCPeerConnection' in window;
 
 export const webrtc = {
   peerConnection,
-  connectionstatechange: peerConnection && 'onconnectionstatechange' in RTCPeerConnection.prototype,
+  connectionstatechange: peerConnection && 'onconnectionstatechange' in RTCPeerConnection.prototype
 };
 
 const browserUa: string = navigator.userAgent.toLowerCase();
@@ -25,9 +25,9 @@ const required = [
   webrtc.peerConnection,
   webaudio.mediaDevices,
   webaudio.getUserMedia,
-  webaudio.audioContext,
+  webaudio.audioContext
 ];
 
 export function checkRequired(): boolean {
-  return required.every((x) => x);
+  return required.every(x => x);
 }
