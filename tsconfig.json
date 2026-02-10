@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "es2019",
-    "moduleResolution": "node",
-    "outDir": "build/",
+    "moduleResolution": "node10",
+    "outDir": "dist/",
     "declaration": true
   },
   "include": ["src"],

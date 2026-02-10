@@ -1,4 +1,4 @@
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 
 import { Session as UserAgentSession } from 'sip.js/lib/api/session';
 

@@ -18,11 +18,10 @@ import { statusFromDialog } from './subscription';
 import { second } from './time';
 import { ITransport, ReconnectableTransport, TransportFactory, UAFactory } from './transport';
 import { IClientOptions, IMedia } from './types';
-import { TypedEventEmitter } from './lib/utils';
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 
 // TODO: use EventTarget instead of EventEmitter.
-export type ClientEventEmitter = TypedEventEmitter<{
+export type ClientEventEmitter = EventEmitter<{
   subscriptionNotify: [string, string];
   sessionAdded: [{ id: string }];
   sessionRemoved: [{ id: string }];
@@ -112,7 +111,7 @@ export interface IClient extends ClientEventEmitter {
    *
    * ```
    */
-  on(event: 'invite', listener: (session: ISession) => void): EventEmitter;
+  on(event: 'invite', listener: (session: ISession) => void): this;
 
   /**
    * When a notify event for a specific subscription occurs, the status is
@@ -129,22 +128,19 @@ export interface IClient extends ClientEventEmitter {
    * await client.subscribe(contact);
    * ```
    */
-  on(
-    event: 'subscriptionNotify',
-    listener: (contact: string, status: string) => void
-  ): EventEmitter;
+  on(event: 'subscriptionNotify', listener: (contact: string, status: string) => void): this;
 
   /**
    * When a session is added to the sessions by an incoming or outgoing
    * call, a sessionAdded event is emitted.
    */
-  on(event: 'sessionAdded', listener: ({ id }) => void): EventEmitter;
+  on(event: 'sessionAdded', listener: ({ id }) => void): this;
 
   /**
    * When a session is removed because it is terminated  a sessionRemoved event
    * is emitted.
    */
-  on(event: 'sessionRemoved', listener: ({ id }) => void): EventEmitter;
+  on(event: 'sessionRemoved', listener: ({ id }) => void): this;
   /* tslint:enable:unified-signatures */
 }
 
@@ -156,7 +152,7 @@ interface ISubscriptionNotification {
  * @hidden
  */
 export class ClientImpl
-  extends TypedEventEmitter<{
+  extends EventEmitter<{
     subscriptionNotify: [string, string];
     sessionAdded: [{ id: string }];
     sessionRemoved: [{ id: string }];
@@ -164,7 +160,8 @@ export class ClientImpl
     statusUpdate: [any];
     invite: [ISession];
   }>
-  implements IClient {
+  implements IClient
+{
   public defaultMedia: IMedia;
 
   private readonly sessions: { [index: string]: SessionImpl } = {};
@@ -314,9 +311,7 @@ export class ClientImpl
 
         setTimeout(() => {
           this.removeSubscription({ uri });
-          this.subscribe(uri)
-            .then(resolve)
-            .catch(reject);
+          this.subscribe(uri).then(resolve).catch(reject);
         }, waitTime);
       });
 
@@ -523,7 +518,7 @@ type ClientCtor = new (options: IClientOptions) => IClient;
  * generally prevents using private attributes. But, even in Typescript there
  * are ways around this.
  */
-export const Client: ClientCtor = (function(clientOptions: IClientOptions) {
+export const Client: ClientCtor = function (clientOptions: IClientOptions) {
   const uaFactory = (options: UserAgentOptions) => {
     return new UserAgent(options);
   };
@@ -552,4 +547,4 @@ export const Client: ClientCtor = (function(clientOptions: IClientOptions) {
     'subscribe',
     'unsubscribe'
   ]);
-} as any) as ClientCtor;
+} as any as ClientCtor;

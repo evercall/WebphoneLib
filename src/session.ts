@@ -24,17 +24,16 @@ import { SessionMedia } from './session-media';
 import { SessionStats } from './session-stats';
 import * as Time from './time';
 import { IMedia, IRemoteIdentity } from './types';
-import { TypedEventEmitter } from './lib/utils';
+import * as EventEmitter from 'node:events';
 
-export interface ISession
-  extends TypedEventEmitter<{
-    terminated: [{ id: string }];
-    statusUpdate: [{ id: string; status: SessionStatus }];
-    callQualityUpdate: [{ id: string }, SessionStats];
-    remoteIdentityUpdate: [{ id: string }, IRemoteIdentity];
-    bye: [];
-    progressUpdate: [{ message: Core.IncomingMessage }];
-  }> {
+export interface ISession extends EventEmitter<{
+  terminated: [{ id: string }];
+  statusUpdate: [{ id: string; status: SessionStatus }];
+  callQualityUpdate: [{ id: string }, SessionStats];
+  remoteIdentityUpdate: [{ id: string }, IRemoteIdentity];
+  bye: [];
+  progressUpdate: [{ message: Core.IncomingMessage }];
+}> {
   readonly id: string;
   readonly media: SessionMedia;
   readonly stats: SessionStats;
@@ -157,7 +156,7 @@ export interface ISessionCancelled {
  * @hidden
  */
 export class SessionImpl
-  extends TypedEventEmitter<{
+  extends EventEmitter<{
     terminated: [{ id: string }];
     statusUpdate: [{ id: string; status: string }];
     callQualityUpdate: [{ id: string }, SessionStats];
@@ -165,7 +164,8 @@ export class SessionImpl
     bye: [];
     progressUpdate: [{ message: Core.IncomingMessage }];
   }>
-  implements ISession {
+  implements ISession
+{
   public readonly id: string;
   public readonly media: SessionMedia;
   public readonly stats: SessionStats;

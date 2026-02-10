@@ -1,7 +1,7 @@
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 
 import * as Features from './features';
-import { eqSet, TypedEventEmitter } from './lib/utils';
+import { eqSet } from './lib/utils';
 import { log } from './logger';
 import * as Time from './time';
 import { IMediaInput } from './types';
@@ -34,12 +34,13 @@ const UPDATE_INTERVAL = 1 * Time.second;
  * with WebRTC.
  */
 class MediaSingleton
-  extends TypedEventEmitter<{
+  extends EventEmitter<{
     devicesChanged: [];
     permissionGranted: [];
     permissionRevoked: [];
   }>
-  implements IMediaDevices {
+  implements IMediaDevices
+{
   private allDevices: IAudioDevice[] = [];
   private requestPermissionPromise: Promise<void>;
   private timer: number = undefined;
@@ -176,22 +177,20 @@ class MediaSingleton
   private updateDevices(enumeratedDevices: MediaDeviceInfo[]) {
     // Map the found devices to our own format, and filter out videoinput's.
     const allDevices = enumeratedDevices
-      .map(
-        (d: MediaDeviceInfo): IAudioDevice => {
-          if (!d.label) {
-            // This should not happen, but safe guard that devices without a name
-            // cannot enter our device state.
-            return undefined;
-          }
-          if (d.kind === 'audioinput') {
-            return { id: d.deviceId, name: d.label, kind: 'audioinput' };
-          } else if (d.kind === 'audiooutput') {
-            return { id: d.deviceId, name: d.label, kind: 'audiooutput' };
-          } else {
-            return undefined;
-          }
+      .map((d: MediaDeviceInfo): IAudioDevice => {
+        if (!d.label) {
+          // This should not happen, but safe guard that devices without a name
+          // cannot enter our device state.
+          return undefined;
         }
-      )
+        if (d.kind === 'audioinput') {
+          return { id: d.deviceId, name: d.label, kind: 'audioinput' };
+        } else if (d.kind === 'audiooutput') {
+          return { id: d.deviceId, name: d.label, kind: 'audiooutput' };
+        } else {
+          return undefined;
+        }
+      })
       .filter(d => d !== undefined);
 
     const newIds = new Set(allDevices.map(d => d.id));

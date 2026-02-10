@@ -1,4 +1,4 @@
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 
 import pRetry from 'p-retry';
 import pTimeout from 'p-timeout';
@@ -17,7 +17,7 @@ import { IncomingInviteRequest, IncomingRequestMessage, TransportError } from 's
 import { ClientStatus, ReconnectionMode } from './enums';
 import * as Features from './features';
 import { HealthChecker } from './health-checker';
-import { increaseTimeout, jitter, TypedEventEmitter } from './lib/utils';
+import { increaseTimeout, jitter } from './lib/utils';
 import { log } from './logger';
 import { sessionDescriptionHandlerFactory } from './session-description-handler';
 import { hour, second } from './time';
@@ -40,14 +40,13 @@ export interface ITransportDelegate {
 /**
  * @hidden
  */
-export interface ITransport
-  extends TypedEventEmitter<{
-    reviveSessions: [];
-    reviveSubscriptions: [];
-    invite: [{ invitation: Invitation; cancelled: any }];
-    statusUpdate: [any];
-    transportDisconnected: [any];
-  }> {
+export interface ITransport extends EventEmitter<{
+  reviveSessions: [];
+  reviveSubscriptions: [];
+  invite: [{ invitation: Invitation; cancelled: any }];
+  statusUpdate: [any];
+  transportDisconnected: [any];
+}> {
   registeredPromise: Promise<any>;
   registered: boolean;
   status: ClientStatus;
@@ -111,14 +110,15 @@ const CANCELLED_REASON = {
  * @hidden
  */
 export class ReconnectableTransport
-  extends TypedEventEmitter<{
+  extends EventEmitter<{
     reviveSessions: [];
     reviveSubscriptions: [];
     invite: [{ invitation: Invitation; cancelled: any }];
     statusUpdate: [any];
     transportDisconnected: [any];
   }>
-  implements ITransport {
+  implements ITransport
+{
   public registeredPromise: Promise<any>;
   public registered = false;
   public status: ClientStatus = ClientStatus.DISCONNECTED;

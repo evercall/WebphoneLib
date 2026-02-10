@@ -15,7 +15,6 @@ function getPropertyDescriptor(obj: any, name: string) {
  * Create immutable proxies for all `properties` on `obj` proxying to `impl`.
  * @hidden
  */
-// eslint-disable-next-line @typescript-eslint/ban-types
 export function createFrozenProxy<T>(obj: object, impl: T, properties: string[]): T {
   const missingDescriptors = properties.filter(
     name => getPropertyDescriptor(impl, name) === undefined
@@ -44,5 +43,5 @@ export function createFrozenProxy<T>(obj: object, impl: T, properties: string[])
         });
       }
     }, obj)
-  );
+  ) as T;
 }

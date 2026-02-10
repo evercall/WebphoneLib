@@ -1,4 +1,4 @@
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 
 // As short as possible mp3 file.
 // source: https://gist.github.com/westonruter/253174
