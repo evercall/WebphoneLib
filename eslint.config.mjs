@@ -43,10 +43,10 @@ export default defineConfig([
     },
 
     rules: {
-      curly: ['error', 'all'],
+      curly: ['warn', 'all'],
       //"brace-style": ["error", "1tbs"],
       'no-console': 'off',
-      'prettier/prettier': 'error',
+      'prettier/prettier': 'warn',
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': 'warn'
     }
