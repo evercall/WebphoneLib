@@ -7,7 +7,7 @@
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "scripts": {
-    "clean": "rm -fR dist/* build/*",
+    "clean": "npx rimraf dist/* build/*",
     "build": "npm run clean && rollup -c",
     "build-watch": "npm run clean && rollup -cw",
     "serve": "serve -l 1235",
@@ -92,6 +92,7 @@
     "nyc": "^14.1.1",
     "prettier": "^3.8.1",
     "pretty-quick": "^4.2.2",
+    "rimraf": "^6.1.2",
     "rollup": "^4.57.1",
     "serve": "^11.3.2",
     "sinon": "^7.5.0",
