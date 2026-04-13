@@ -7,7 +7,7 @@
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "scripts": {
-    "clean": "npx rimraf -g dist/* build/*",
+    "clean": "npx rimraf@latest -g dist/* build/*",
     "build": "npm run clean && rollup -c",
     "build-watch": "npm run clean && rollup -cw",
     "serve": "serve -l 1235",
