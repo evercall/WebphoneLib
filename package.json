@@ -1,6 +1,6 @@
 {
   "name": "webphone-lib",
-  "version": "0.2.25",
+  "version": "0.2.26",
   "description": "Webphone Lib",
   "author": "Open VoIP Alliance",
   "license": "MIT",
@@ -8,8 +8,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "clean": "npx rimraf@latest -g dist/* build/*",
-    "build": "npm run clean && rollup -c",
-    "build-watch": "npm run clean && rollup -cw",
+    "build": "rollup -c",
+    "build-watch": "rollup -cw",
     "serve": "serve -l 1235",
     "demo": "run-p build-watch serve",
     "typecheck": "tsc",
