@@ -60,8 +60,8 @@
     "README.md"
   ],
   "dependencies": {
-    "p-retry": "^8.0.0",
-    "p-timeout": "^7.0.1",
+    "p-retry": "^4.1.0",
+    "p-timeout": "^3.2.0",
     "sip.js": "0.15.6"
   },
   "devDependencies": {
