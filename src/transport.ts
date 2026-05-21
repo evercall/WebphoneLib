@@ -171,13 +171,14 @@ export class ReconnectableTransport
       logLevel: 'warn',
       sessionDescriptionHandlerFactory,
       sessionDescriptionHandlerFactoryOptions: {
-        alwaysAcquireMediaFirst: Features.isFirefox,
+        alwaysAcquireMediaFirst: transport.alwaysAcquireMediaFirst ?? Features.isFirefox,
         constraints: { audio: true, video: false },
         modifiers,
         peerConnectionOptions: {
           rtcConfiguration: {
             iceServers: transport.iceServers.map((s: string) => ({ urls: s }))
-          }
+          },
+          iceCheckingTimeout: transport.iceCheckingTimeout ?? 500
         }
       },
       transportConstructor: WrappedTransport,

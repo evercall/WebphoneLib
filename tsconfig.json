@@ -1,9 +1,12 @@
 {
   "compilerOptions": {
     "target": "es2019",
-    "moduleResolution": "node10",
+    "moduleResolution": "node",
+    "module": "es2020",
     "outDir": "dist/",
-    "declaration": true
+    "declaration": true,
+    "skipLibCheck": true,
+    "rootDir": "./src"
   },
   "include": ["src"],
   "typedocOptions": {

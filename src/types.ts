@@ -11,6 +11,8 @@ export interface IClientOptions {
     wsServers: string;
     iceServers: string[];
     delegate?: ITransportDelegate;
+    iceCheckingTimeout?: number;
+    alwaysAcquireMediaFirst?: boolean;
   };
   media: IMedia;
   userAgentString?: string;
