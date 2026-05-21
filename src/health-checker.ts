@@ -52,7 +52,7 @@ export class HealthChecker {
 
     /* If no 'registrarServer' is set use the 'uri' value without user portion. */
     if (!settings.registrar) {
-      let registrarServer: any = {};
+      let registrarServer: any;
       if (typeof this.userAgent.configuration.uri === 'object') {
         registrarServer = this.userAgent.configuration.uri.clone();
         registrarServer.user = undefined;
