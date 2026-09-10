@@ -22,6 +22,7 @@ import { log } from './logger';
 import { sessionDescriptionHandlerFactory } from './session-description-handler';
 import { hour, second } from './time';
 import { IClientOptions, IRetry } from './types';
+import { InviterOptions } from 'sip.js/lib/api';
 
 export type UAFactory = (options: UserAgentOptions) => UserAgent;
 
@@ -138,6 +139,7 @@ export class ReconnectableTransport
   private boundOnWindowOnline: EventListenerOrEventListenerObject;
   private wasWindowOffline = false;
   private healthChecker: HealthChecker;
+  private inviterOptions?: InviterOptions;
 
   constructor(uaFactory: UAFactory, options: IClientOptions) {
     super();
@@ -155,6 +157,10 @@ export class ReconnectableTransport
   public configure(options: IClientOptions) {
     const { account, transport, userAgentString } = options;
     const uri = UserAgent.makeURI(account.uri);
+
+    if (transport.inviterOptions !== undefined) {
+      this.inviterOptions = transport.inviterOptions;
+    }
 
     const modifiers = [Web.Modifiers.stripVideo];
     if (Features.isSafari) {
@@ -291,18 +297,18 @@ export class ReconnectableTransport
       throw new Error('Cannot send an invite. Not connected.');
     }
 
-    return new Inviter(this.userAgent, UserAgent.makeURI(phoneNumber));
+    return new Inviter(this.userAgent, UserAgent.makeURI(phoneNumber)!, this.inviterOptions);
   }
 
   public createSubscriber(contact: string): Subscriber {
     // Introducing a jitter here, to avoid thundering herds.
-    return new Subscriber(this.userAgent, UserAgent.makeURI(contact), 'dialog', {
+    return new Subscriber(this.userAgent, UserAgent.makeURI(contact)!, 'dialog', {
       expires: SIP_PRESENCE_EXPIRE + jitter(SIP_PRESENCE_EXPIRE, 30)
     });
   }
 
   public createPublisher(contact: string, options: PublisherOptions) {
-    return new Publisher(this.userAgent, UserAgent.makeURI(contact), 'dialog', options);
+    return new Publisher(this.userAgent, UserAgent.makeURI(contact)!, 'dialog', options);
   }
 
   public isRegistered() {

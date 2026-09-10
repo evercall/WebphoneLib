@@ -1,4 +1,5 @@
 import { ITransportDelegate } from './transport';
+import { InviterOptions } from 'sip.js/lib/api';
 
 export interface IClientOptions {
   account: {
@@ -13,6 +14,7 @@ export interface IClientOptions {
     delegate?: ITransportDelegate;
     iceCheckingTimeout?: number;
     alwaysAcquireMediaFirst?: boolean;
+    inviterOptions?: InviterOptions;
   };
   media: IMedia;
   userAgentString?: string;
