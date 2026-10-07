@@ -19,6 +19,7 @@ import { second } from './time';
 import { ITransport, ReconnectableTransport, TransportFactory, UAFactory } from './transport';
 import { IClientOptions, IMedia } from './types';
 import { EventEmitter } from 'node:events';
+import { InviterOptions } from 'sip.js/lib/api';
 
 // TODO: use EventTarget instead of EventEmitter.
 export type ClientEventEmitter = EventEmitter<{
@@ -26,7 +27,7 @@ export type ClientEventEmitter = EventEmitter<{
   sessionAdded: [{ id: string }];
   sessionRemoved: [{ id: string }];
   subscriptionTerminated: [string];
-  statusUpdate: [any];
+  statusUpdate: [ClientStatus];
   invite: [ISession];
 }>;
 
@@ -55,6 +56,7 @@ export interface IClient extends ClientEventEmitter {
   close(): Promise<void>;
 
   isConnected(): boolean;
+  getTransportStatus(): ClientStatus;
 
   /**
    * Make an outgoing call. Requires you to be registered to a sip server.
@@ -64,13 +66,14 @@ export interface IClient extends ClientEventEmitter {
    * process.
    *
    * @param uri  For example "sip:497920039@voipgrid.nl"
+   * @param inviterOptions Extra options for this outgoing call
    */
-  invite(uri: string): Promise<ISession>;
+  invite(uri: string, inviterOptions?: InviterOptions): Promise<ISession>;
 
   subscribe(uri: string): Promise<void>;
   unsubscribe(uri: string): void;
 
-  getSession(id: string): ISession;
+  getSession(id: string): ISession | undefined;
   getSessions(): ISession[];
 
   /**
@@ -134,13 +137,18 @@ export interface IClient extends ClientEventEmitter {
    * When a session is added to the sessions by an incoming or outgoing
    * call, a sessionAdded event is emitted.
    */
-  on(event: 'sessionAdded', listener: ({ id }) => void): this;
+  on(event: 'sessionAdded', listener: ({ id }: { id: string }) => void): this;
 
   /**
    * When a session is removed because it is terminated  a sessionRemoved event
    * is emitted.
    */
-  on(event: 'sessionRemoved', listener: ({ id }) => void): this;
+  on(event: 'sessionRemoved', listener: ({ id }: { id: string }) => void): this;
+
+  /**
+   * Emitted when the underlying transport status changes
+   */
+  on(event: 'statusUpdate', listener: (status: ClientStatus) => void): this;
   /* tslint:enable:unified-signatures */
 }
 
@@ -157,7 +165,7 @@ export class ClientImpl
     sessionAdded: [{ id: string }];
     sessionRemoved: [{ id: string }];
     subscriptionTerminated: [string];
-    statusUpdate: [any];
+    statusUpdate: [ClientStatus];
     invite: [ISession];
   }>
   implements IClient
@@ -185,6 +193,10 @@ export class ClientImpl
   }
 
   public async reconfigure(options: IClientOptions): Promise<void> {
+    if (!this.transport) {
+      log.error('Transport is undefined', this.constructor.name);
+      throw new Error('Cannot reconfigure. transport undefined');
+    }
     await this.disconnect();
 
     this.defaultMedia = options.media;
@@ -194,10 +206,20 @@ export class ClientImpl
   }
 
   public connect(): Promise<boolean> {
+    if (!this.transport) {
+      log.error('Transport is undefined', this.constructor.name);
+      throw new Error('Cannot connect. transport undefined');
+    }
+
     return this.transport.connect();
   }
 
   public async disconnect(): Promise<void> {
+    if (!this.transport) {
+      log.error('Transport is undefined', this.constructor.name);
+      throw new Error('Cannot disconnect. transport undefined');
+    }
+
     // Actual unsubscribing is done in ua.stop
     await this.transport.disconnect({ hasRegistered: true });
     this.subscriptions = {};
@@ -207,8 +229,16 @@ export class ClientImpl
     return this.connected;
   }
 
-  public async invite(uri: string): Promise<ISession> {
-    if (!this.transport.registeredPromise) {
+  public getTransportStatus(): ClientStatus {
+    if (!this.transport) {
+      return ClientStatus.DISCONNECTED;
+    }
+
+    return this.transport.status;
+  }
+
+  public async invite(uri: string, inviterOptions?: InviterOptions): Promise<ISession> {
+    if (!this.transport?.registeredPromise) {
       throw new Error('Register first!');
     }
 
@@ -222,26 +252,31 @@ export class ClientImpl
       // that the socket is broken. In that case getConnection will try to
       // regain connection, to quickly re-invite over the newly created
       // socket (or not).
-      session = await this.tryInvite(uri).catch(async () => {
+      session = await this.tryInvite(uri, inviterOptions).catch(async () => {
         log.error('The WebSocket broke during the act of inviting.', this.constructor.name);
-        await this.transport.getConnection(ReconnectionMode.ONCE);
+        await this.transport!.getConnection(ReconnectionMode.ONCE);
 
-        if (this.transport.status !== ClientStatus.CONNECTED) {
+        if (this.transport!.status !== ClientStatus.CONNECTED) {
           throw new Error('Not sending out invite. It appears we are not connected.');
         }
 
         log.debug('New WebSocket is created.', this.constructor.name);
-        return await this.tryInvite(uri);
+        return await this.tryInvite(uri, inviterOptions);
       });
     } catch (e) {
       log.error(e, this.constructor.name);
-      return;
+      throw e;
     }
 
     return session.freeze();
   }
 
   public async close(): Promise<void> {
+    if (!this.transport) {
+      log.error('Transport is undefined', this.constructor.name);
+      throw new Error('Cannot close. transport undefined');
+    }
+
     await this.disconnect();
 
     this.transport.close();
@@ -251,7 +286,7 @@ export class ClientImpl
   }
 
   public subscribe(uri: string): Promise<void> {
-    if (!this.transport.registeredPromise) {
+    if (!this.transport?.registeredPromise) {
       throw new Error('Register first!');
     }
 
@@ -262,7 +297,7 @@ export class ClientImpl
         return;
       }
 
-      this.subscriptions[uri] = this.transport.createSubscriber(uri);
+      this.subscriptions[uri] = this.transport!.createSubscriber(uri);
 
       this.subscriptions[uri].delegate = {
         onNotify: (notification: Notification) => {
@@ -337,11 +372,12 @@ export class ClientImpl
     this.removeSubscription({ uri, unsubscribe: true });
   }
 
-  public getSession(id: string): ISession {
+  public getSession(id: string): ISession | undefined {
     const session = this.sessions[id];
     if (session) {
       return session.freeze();
     }
+    return undefined;
   }
 
   public getSessions(): ISession[] {
@@ -363,7 +399,7 @@ export class ClientImpl
   }
 
   public createPublisher(contact: string, options: PublisherOptions): Publisher {
-    if (!this.transport.registeredPromise) {
+    if (!this.transport?.registeredPromise) {
       throw new Error('Register first!');
     }
 
@@ -434,8 +470,11 @@ export class ClientImpl
     this.removeSession(session);
   }
 
-  private async tryInvite(phoneNumber: string): Promise<SessionImpl> {
-    const outgoingSession = this.transport.createInviter(phoneNumber);
+  private async tryInvite(
+    phoneNumber: string,
+    inviterOptions?: InviterOptions
+  ): Promise<SessionImpl> {
+    const outgoingSession = this.transport!.createInviter(phoneNumber, inviterOptions);
 
     const session = new Inviter({
       media: this.defaultMedia,
@@ -449,7 +488,7 @@ export class ClientImpl
     let rejectWithError;
     const disconnectedPromise = new Promise((resolve, reject) => {
       rejectWithError = () => reject(new Error('Socket broke during inviting'));
-      this.transport.once('transportDisconnected', rejectWithError);
+      this.transport!.once('transportDisconnected', rejectWithError);
     });
 
     try {
@@ -463,13 +502,15 @@ export class ClientImpl
       log.error('Could not send an invite. Socket could be broken.', this.constructor.name);
       return Promise.reject(new Error('Could not send an invite. Socket could be broken.'));
     } finally {
-      this.transport.removeListener('transportDisconnected', rejectWithError);
+      if (rejectWithError) {
+        this.transport!.removeListener('transportDisconnected', rejectWithError);
+      }
     }
 
     return session;
   }
 
-  private removeSubscription({ uri, unsubscribe = false }) {
+  private removeSubscription({ uri, unsubscribe = false }: { uri: string; unsubscribe?: boolean }) {
     if (!(uri in this.subscriptions)) {
       return;
     }
@@ -528,6 +569,7 @@ export const Client: ClientCtor = function (clientOptions: IClientOptions) {
   };
 
   const impl = new ClientImpl(uaFactory, transportFactory, clientOptions);
+  // @ts-expect-error improperly typed
   createFrozenProxy(this, impl, [
     'attendedTransfer',
     'connect',
@@ -538,6 +580,7 @@ export const Client: ClientCtor = function (clientOptions: IClientOptions) {
     'getSessions',
     'invite',
     'isConnected',
+    'getTransportStatus',
     'on',
     'once',
     'reconfigure',
@@ -547,4 +590,4 @@ export const Client: ClientCtor = function (clientOptions: IClientOptions) {
     'subscribe',
     'unsubscribe'
   ]);
-} as any as ClientCtor;
+} as unknown as ClientCtor;

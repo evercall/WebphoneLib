@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 
-import pRetry from 'p-retry';
+import pRetry, { FailedAttemptError } from 'p-retry';
 import pTimeout from 'p-timeout';
 import { Core, Web } from 'sip.js';
 import { Invitation } from 'sip.js/lib/api/invitation';
@@ -11,7 +11,7 @@ import { Registerer } from 'sip.js/lib/api/registerer';
 import { RegistererState } from 'sip.js/lib/api/registerer-state';
 import { Subscriber } from 'sip.js/lib/api/subscriber';
 import { UserAgent } from 'sip.js/lib/api/user-agent';
-import { SIPExtension, UserAgentOptions } from 'sip.js/lib/api/user-agent-options';
+import { LogConnector, SIPExtension, UserAgentOptions } from 'sip.js/lib/api/user-agent-options';
 import { IncomingInviteRequest, IncomingRequestMessage, TransportError } from 'sip.js/lib/core';
 
 import { ClientStatus, ReconnectionMode } from './enums';
@@ -45,21 +45,21 @@ export interface ITransport extends EventEmitter<{
   reviveSessions: [];
   reviveSubscriptions: [];
   invite: [{ invitation: Invitation; cancelled: any }];
-  statusUpdate: [any];
+  statusUpdate: [ClientStatus];
   transportDisconnected: [any];
 }> {
-  registeredPromise: Promise<any>;
+  registeredPromise?: Promise<any>;
   registered: boolean;
   status: ClientStatus;
   delegate?: ITransportDelegate;
 
   configure(options: IClientOptions): void;
   connect(): Promise<boolean>;
-  disconnect(options?: { hasRegistered: boolean }): Promise<void>;
+  disconnect({ hasRegistered }: { hasRegistered?: boolean }): Promise<void>;
   updatePriority(flag: boolean): void;
   getConnection(mode: ReconnectionMode): Promise<boolean>;
   close(): void;
-  createInviter(phoneNumber: string): Inviter;
+  createInviter(phoneNumber: string, inviterOptions?: InviterOptions): Inviter;
   createSubscriber(contact: string): Subscriber;
   createPublisher(contact: string, options: PublisherOptions): Publisher;
 }
@@ -91,15 +91,15 @@ export class WrappedTransport extends Web.Transport {
 
 const SIP_PRESENCE_EXPIRE = hour / second; // one hour in seconds
 
-const logLevelConversion = {
+const logLevelConversion: Record<Core.Levels, 'debug' | 'info' | 'warn' | 'error'> = {
   [Core.Levels.debug]: 'debug',
   [Core.Levels.log]: 'info',
   [Core.Levels.warn]: 'warn',
   [Core.Levels.error]: 'error'
 };
 
-const connector = (level, category, label, content) => {
-  const convertedLevel = logLevelConversion[level] || 'debug';
+const connector: LogConnector = (level, category, label, content) => {
+  const convertedLevel = typeof level === 'number' ? logLevelConversion[level] : level;
   log.log(convertedLevel, content, category);
 };
 
@@ -120,25 +120,25 @@ export class ReconnectableTransport
   }>
   implements ITransport
 {
-  public registeredPromise: Promise<any>;
+  public registeredPromise?: Promise<any>;
   public registered = false;
   public status: ClientStatus = ClientStatus.DISCONNECTED;
   public delegate?: ITransportDelegate;
   private priority = false;
-  private unregisteredPromise: Promise<any>;
+  private unregisteredPromise?: Promise<any>;
   private uaFactory: UAFactory;
-  private uaOptions: UserAgentOptions;
-  private userAgent: UserAgent;
+  private uaOptions!: UserAgentOptions;
+  private userAgent?: UserAgent;
   private dyingCounter = 60000;
   private wsTimeout = 10000;
-  private dyingIntervalID: number;
+  private dyingIntervalID?: number;
   private retry: IRetry = { interval: 2000, limit: 30000, timeout: 250 };
-  private registerer: Registerer;
-  private unregisterer: Registerer;
+  private registerer?: Registerer;
+  private unregisterer?: Registerer;
   private boundOnWindowOffline: EventListenerOrEventListenerObject;
   private boundOnWindowOnline: EventListenerOrEventListenerObject;
   private wasWindowOffline = false;
-  private healthChecker: HealthChecker;
+  private healthChecker?: HealthChecker;
   private inviterOptions?: InviterOptions;
 
   constructor(uaFactory: UAFactory, options: IClientOptions) {
@@ -148,7 +148,7 @@ export class ReconnectableTransport
     this.configure(options);
 
     this.boundOnWindowOffline = this.onWindowOffline.bind(this);
-    this.boundOnWindowOnline = this.tryUntilConnected.bind(this);
+    this.boundOnWindowOnline = () => this.tryUntilConnected();
 
     window.addEventListener('offline', this.boundOnWindowOffline);
     window.addEventListener('online', this.boundOnWindowOnline);
@@ -229,7 +229,7 @@ export class ReconnectableTransport
       return this.registeredPromise;
     }
 
-    await pTimeout(this.userAgent.start(), this.wsTimeout, () => {
+    await pTimeout(this.userAgent!.start(), this.wsTimeout, () => {
       log.info('Could not connect to the websocket in time.', this.constructor.name);
       return Promise.reject(new Error('Could not connect to the websocket in time.'));
     });
@@ -237,10 +237,10 @@ export class ReconnectableTransport
     this.createHealthChecker();
 
     this.registeredPromise = this.createRegisteredPromise();
-    this.registerer.register();
+    this.registerer?.register();
 
     return this.registeredPromise.then(success => {
-      this.healthChecker.start();
+      this.healthChecker?.start();
       return success;
     });
   }
@@ -268,7 +268,7 @@ export class ReconnectableTransport
 
       log.info('Trying to unregister.', this.constructor.name);
 
-      this.unregisterer.unregister();
+      this.unregisterer?.unregister();
 
       // Little protection to make sure our account is actually unregistered
       // and received an ACK before other functions are called
@@ -291,16 +291,30 @@ export class ReconnectableTransport
     delete this.unregisteredPromise;
   }
 
-  public createInviter(phoneNumber: string): Inviter {
+  public createInviter(phoneNumber: string, inviterOptions?: InviterOptions): Inviter {
+    if (!this.userAgent) {
+      log.error('UserAgent is undefined', this.constructor.name);
+      throw new Error('Cannot send an invite. UserAgent undefined');
+    }
+
     if (this.status !== ClientStatus.CONNECTED) {
       log.info('Could not send an invite. Not connected.', this.constructor.name);
       throw new Error('Cannot send an invite. Not connected.');
     }
 
-    return new Inviter(this.userAgent, UserAgent.makeURI(phoneNumber)!, this.inviterOptions);
+    const inviteOptions = inviterOptions
+      ? { ...this.inviterOptions, ...inviterOptions }
+      : this.inviterOptions;
+
+    return new Inviter(this.userAgent, UserAgent.makeURI(phoneNumber)!, inviteOptions);
   }
 
   public createSubscriber(contact: string): Subscriber {
+    if (!this.userAgent) {
+      log.error('UserAgent is undefined', this.constructor.name);
+      throw new Error('Cannot create Subscriber. UserAgent undefined');
+    }
+
     // Introducing a jitter here, to avoid thundering herds.
     return new Subscriber(this.userAgent, UserAgent.makeURI(contact)!, 'dialog', {
       expires: SIP_PRESENCE_EXPIRE + jitter(SIP_PRESENCE_EXPIRE, 30)
@@ -308,6 +322,11 @@ export class ReconnectableTransport
   }
 
   public createPublisher(contact: string, options: PublisherOptions) {
+    if (!this.userAgent) {
+      log.error('UserAgent is undefined', this.constructor.name);
+      throw new Error('Cannot create Publisher. UserAgent undefined');
+    }
+
     return new Publisher(this.userAgent, UserAgent.makeURI(contact)!, 'dialog', options);
   }
 
@@ -335,14 +354,14 @@ export class ReconnectableTransport
       log.debug('Socket opened', this.constructor.name);
 
       this.registeredPromise = this.createRegisteredPromise();
-      this.registerer.register();
+      this.registerer?.register();
 
       this.createHealthChecker();
 
       await this.registeredPromise;
       log.debug('Reregistered!', this.constructor.name);
 
-      this.healthChecker.start();
+      this.healthChecker?.start();
 
       // Before the dyingCounter reached 0, there is a decent chance our
       // sessions are still alive and kicking. Let's try to revive them.
@@ -383,7 +402,7 @@ export class ReconnectableTransport
       const checkSocket = new WebSocket(this.uaOptions.transportOptions.wsServers, 'sip');
 
       const handlers = {
-        onError: e => {
+        onError: (e: unknown) => {
           log.debug(e, this.constructor.name);
 
           checkSocket.removeEventListener('open', handlers.onOpen);
@@ -419,13 +438,16 @@ export class ReconnectableTransport
         // Patch the onCancel delegate function to parse the reason of
         // cancellation. This is then used by the terminatedPromise of
         // a Session to return the reason when a session is terminated.
-        const cancelled = { reason: undefined };
+        const cancelled: { reason?: string } = { reason: undefined };
         const onCancel = (invitation as any).incomingInviteRequest.delegate.onCancel;
         (invitation as any).incomingInviteRequest.delegate.onCancel = (
           message: Core.IncomingRequestMessage
         ) => {
-          const reason = this.parseHeader(message.getHeader('reason'));
-          cancelled.reason = reason ? CANCELLED_REASON[reason.get('text')] : undefined;
+          const reason = this.parseHeader(message.getHeader('reason'))?.get('text');
+          cancelled.reason =
+            reason && reason in CANCELLED_REASON
+              ? CANCELLED_REASON[reason as keyof typeof CANCELLED_REASON]
+              : undefined;
           onCancel(message);
         };
         this.emit('invite', { invitation, cancelled });
@@ -442,7 +464,7 @@ export class ReconnectableTransport
       this.userAgent.userAgentCore.delegate.onInvite = async (
         incomingInviteRequest: IncomingInviteRequest
       ): Promise<void> => {
-        const invitation = new Invitation(this.userAgent, incomingInviteRequest);
+        const invitation = new Invitation(this.userAgent!, incomingInviteRequest);
         const ua = this.userAgent as any; // Cast to any so we can access private and protected properties.
 
         incomingInviteRequest.delegate = {
@@ -598,7 +620,7 @@ export class ReconnectableTransport
       forever: true,
       maxTimeout: 100, // Note: this is time between retries, not time before operation times out
       minTimeout: 100,
-      onFailedAttempt: error => {
+      onFailedAttempt: (error: FailedAttemptError) => {
         log.debug(
           `Connection attempt ${error.attemptNumber} failed. There are ${error.retriesLeft} retries left.`,
           this.constructor.name
@@ -643,7 +665,9 @@ export class ReconnectableTransport
    *  clients that are not in a call have to wait an amount of time which
    *  increments every failure, before reconnecting to the server.
    */
-  private async tryUntilConnected({ skipCheck }: { skipCheck: boolean } = { skipCheck: false }) {
+  private async tryUntilConnected(
+    { skipCheck }: { skipCheck: boolean } | undefined = { skipCheck: false }
+  ) {
     // To avoid triggering multiple times, return if status is recovering.
     if (ClientStatus.RECOVERING === this.status && !skipCheck) {
       return;
@@ -675,6 +699,11 @@ export class ReconnectableTransport
   }
 
   private createRegisteredPromise() {
+    if (!this.userAgent) {
+      log.error('UserAgent is undefined', this.constructor.name);
+      throw new Error('Cannot create registered promise. UserAgent undefined');
+    }
+
     if (this.registerer) {
       // Remove from UA's collection, not using this.registerer.dispose to
       // avoid unregistering.
@@ -685,7 +714,7 @@ export class ReconnectableTransport
 
     return new Promise((resolve, reject) => {
       // Handle outgoing session state changes.
-      this.registerer.stateChange.once(async (newState: RegistererState) => {
+      this.registerer!.stateChange.once(async (newState: RegistererState) => {
         switch (newState) {
           case RegistererState.Registered:
             this.updateStatus(ClientStatus.CONNECTED);
@@ -705,6 +734,11 @@ export class ReconnectableTransport
   }
 
   private createUnregisteredPromise() {
+    if (!this.userAgent) {
+      log.error('UserAgent is undefined', this.constructor.name);
+      throw new Error('Cannot create unregistered promise. UserAgent undefined');
+    }
+
     if (this.unregisterer) {
       // Remove from UA's collection, not using this.registerer.dispose to
       // avoid unregistering.
@@ -715,7 +749,7 @@ export class ReconnectableTransport
 
     return new Promise((resolve, reject) => {
       // Handle outgoing session state changes.
-      this.unregisterer.stateChange.once(async (newState: RegistererState) => {
+      this.unregisterer!.stateChange.once(async (newState: RegistererState) => {
         if (newState === RegistererState.Unregistered) {
           log.info('State changed to Unregistered.', this.constructor.name);
           resolve(true);
@@ -764,6 +798,11 @@ export class ReconnectableTransport
   }
 
   private createHealthChecker() {
+    if (!this.userAgent) {
+      log.error('UserAgent is undefined', this.constructor.name);
+      throw new Error('Cannot create HealthChecker. UserAgent undefined');
+    }
+
     this.stopHealthChecker();
     this.healthChecker = new HealthChecker(this.userAgent);
   }
@@ -821,7 +860,7 @@ export class ReconnectableTransport
    * @param {string} header - The header to parse.
    * @returns {Map} - A map of key/values of the header.
    */
-  private parseHeader(header?: string): Map<string, string> {
+  private parseHeader(header?: string): Map<string, string> | undefined {
     if (header) {
       return new Map(
         header
