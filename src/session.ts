@@ -33,6 +33,7 @@ export interface ISession extends EventEmitter<{
   remoteIdentityUpdate: [{ id: string }, IRemoteIdentity];
   bye: [];
   progressUpdate: [{ message: Core.IncomingMessage }];
+  dtmf: [{ id: string; tones: string }];
 }> {
   readonly id: string;
   readonly media: SessionMedia;
@@ -163,6 +164,7 @@ export class SessionImpl
     remoteIdentityUpdate: [{ id: string }, IRemoteIdentity];
     bye: [];
     progressUpdate: [{ message: Core.IncomingMessage }];
+    dtmf: [{ id: string; tones: string }];
   }>
   implements ISession
 {
@@ -174,6 +176,7 @@ export class SessionImpl
   public saidBye: boolean;
   public holdState: boolean;
   public status: SessionStatus = SessionStatus.TRYING;
+  public dtmfTonesSent: string = '';
 
   protected acceptedPromise: Promise<ISessionAccept>;
   protected inviteOptions: InviterInviteOptions;
@@ -398,7 +401,12 @@ export class SessionImpl
     // no feedback about the failure.
     //
     // For now only use the RTP method using the session description handler.
-    return this.session.sessionDescriptionHandler.sendDtmf(tones, options);
+    const success = this.session.sessionDescriptionHandler.sendDtmf(tones, options);
+    if (success) {
+      this.dtmfTonesSent += tones;
+      this.emit('dtmf', { id: this.id, tones });
+    }
+    return success;
   }
 
   public get localStream() {
@@ -447,7 +455,8 @@ export class SessionImpl
       'cancel',
       'tried',
       'localStream',
-      'remoteStream'
+      'remoteStream',
+      'dtmfTonesSent'
     ]);
   }
 
