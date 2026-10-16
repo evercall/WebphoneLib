@@ -43,6 +43,7 @@ export interface ISession extends EventEmitter<{
   saidBye: boolean;
   holdState: boolean;
   status: SessionStatus;
+  dtmfTonesSent: string;
 
   /**
    * The remote identity of this session.
