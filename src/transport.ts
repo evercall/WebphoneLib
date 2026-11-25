@@ -239,10 +239,14 @@ export class ReconnectableTransport
     this.registeredPromise = this.createRegisteredPromise();
     this.registerer?.register();
 
-    return this.registeredPromise.then(success => {
-      this.healthChecker?.start();
-      return success;
-    });
+    return this.registeredPromise
+      .then(success => {
+        this.healthChecker?.start();
+        return success;
+      })
+      .catch(e => {
+        return Promise.reject(e);
+      });
   }
 
   // Unregister (and subsequently disconnect) to server.

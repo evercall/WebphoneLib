@@ -572,6 +572,7 @@ export const Client: ClientCtor = function (clientOptions: IClientOptions) {
   // @ts-expect-error improperly typed
   createFrozenProxy(this, impl, [
     'attendedTransfer',
+    'close',
     'connect',
     'createPublisher',
     'defaultMedia',
