@@ -10,7 +10,7 @@ export interface IClientOptions {
   };
   transport: {
     wsServers: string;
-    iceServers: string[];
+    iceServers: RTCIceServer[] | string[];
     delegate?: ITransportDelegate;
     iceCheckingTimeout?: number;
     alwaysAcquireMediaFirst?: boolean;

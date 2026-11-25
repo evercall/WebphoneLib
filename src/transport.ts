@@ -167,6 +167,8 @@ export class ReconnectableTransport
       modifiers.push(Web.Modifiers.stripG722);
     }
 
+    const iceServers = transport.iceServers.map(s => (typeof s === 'string' ? { urls: s } : s));
+
     this.uaOptions = {
       autoStart: false,
       autoStop: false,
@@ -182,7 +184,7 @@ export class ReconnectableTransport
         modifiers,
         peerConnectionOptions: {
           rtcConfiguration: {
-            iceServers: transport.iceServers.map((s: string) => ({ urls: s }))
+            iceServers
           },
           iceCheckingTimeout: transport.iceCheckingTimeout ?? 500
         }
